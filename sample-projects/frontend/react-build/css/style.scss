@@ -1,0 +1,24 @@
+body {
+  padding: 50px;
+  font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
+  a {
+    color: #00B7FF
+  }
+  .file-name {
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .col-sm-6 {
+    margin-bottom: 1.5em;
+  }
+  iframe {
+    width: 100%;
+    height: auto;
+    border: solid silver 1px;
+    min-height: 70vh;
+  }
+  i.fa {
+    cursor: pointer;
+  }
+}
+

@@ -1,0 +1,5 @@
+{
+    "certificateArn": "arn:aws:acm:us-east-1:966727776968:certificate/9e29e26d-1c7c-4dc3-bede-8ffc34686d7e",
+    "domainNames": ["frontend.k-medics.site"],
+    "assetPath": "react-build"
+}
