@@ -1,0 +1,14 @@
+{
+    "Plus1Dev": {
+        "elasticIp": "3.11.133.88",
+        "dbname": "plus1_dev_db"
+    },
+    "Plus1UAT": {
+        "elasticIp": "3.11.133.88",
+        "dbname": "plus1_uat_db"
+    },
+    "Plus1Prod": {
+        "elasticIp": "3.11.133.88",
+        "dbname": "plus1_prod_db"
+    }
+}
