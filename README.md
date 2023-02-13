@@ -118,21 +118,30 @@ __References__
 [Install Python 3 on MacOS using Brew](https://www.freecodecamp.org/news/python-version-on-mac-update/)
 
 ## Chapter 2: AWS CDK Application  
-__AW CDK Development workflow__  
-1. Create the app from a template provided by the AWS CDK
+__AWS CDK Development workflow__  
+1. Create your project folder
 ```
+$ mkdir cloud-app
+```
+2. Create the app from a template provided by the AWS CDK.
+```
+$ cs cloud-app
 $ cdk  init app --language typescript
 ```
-2. Add code to the app to create resources within stacks
-3. Build the app (optional; the AWS CDK Toolkit will do it for you if you forget)
+_app_ is the name of the template used. Other templates are _sample-app_ and _lib_.  
+3. Add code to the app to create resources within stacks
+4. Build the app (optional; the AWS CDK Toolkit will do it for you if you forget)
 ```
 $ npm run build
 ```
-4. Synthesize one or more stacks in the app to create an AWS CloudFormation template
+5. Synthesize one or more stacks in the app to create an AWS CloudFormation template
 ```
 $ cdk synth
 ```
-5. Deploy one or more stacks to your AWS account
+6. Deploy one or more stacks to your AWS account
+```
+$ cdk deploy
+```
 
 __Create a CDK project__  
 First create the directory

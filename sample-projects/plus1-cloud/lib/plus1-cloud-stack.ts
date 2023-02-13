@@ -1,6 +1,9 @@
+import { FrontendResources } from './frontend-resources';
+import { CongnitoUtil } from './cognito.util';
+import { PipelineUtil } from './pipeline-util';
 import { join } from 'path';
 import { readFileSync } from 'fs';
-import { Duration, Stack, StackProps, CfnOutput, RemovalPolicy } from 'aws-cdk-lib';
+import { Duration, Stack, StackProps, CfnOutput, RemovalPolicy , Tags} from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as rds from 'aws-cdk-lib/aws-rds';
@@ -9,14 +12,24 @@ import { Construct } from 'constructs';
  
 import { IStackEnv } from './../src/interfaces/IStackEnv';
 import { IConfig } from './../src/interfaces/IConfig';
+import { IOutputParams } from '../src/interfaces/IOutputParams';
 
+type Vpc = ec2.Vpc;
+type SecurityGroup = ec2.SecurityGroup;
+type Instance = ec2.Instance;
+type DatabaseInstance = rds.DatabaseInstance;
+type Role = iam.Role;
 export class Plus1CloudStack extends Stack {
   stackProps: StackProps = {};
+
+  ec2TagValue = "";
 
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
 
     this.stackProps = props || {};
+
+    this.ec2TagValue = `${this.stackProps.stackName}Server`;
 
     const key =  this.createKeyPair();
     
@@ -24,7 +37,9 @@ export class Plus1CloudStack extends Stack {
 
     const securityGroup = this.createSecurityGroups(vpc);
 
-    const ec2Instance = this.provisionEc2Instance(vpc, securityGroup, key);
+    const deploymentAppAndGroup =  new PipelineUtil(this).createDeploymentApp();
+
+    const ec2Instance = this.provisionEc2Instance(vpc, securityGroup, key, deploymentAppAndGroup.codeDeployRole);
     
     this.associateEipToEc2(ec2Instance);
 
@@ -32,7 +47,18 @@ export class Plus1CloudStack extends Stack {
 
     const dbInstance = this.provisionDbInstance(vpc, ec2Instance);
 
-    this.setupOutput(ec2Instance, dbInstance, key);
+    const userPoolAndClient = CongnitoUtil.createUserPool(this);
+
+    const distAndBucket = new FrontendResources(this).provisionResources();
+
+    this.setupOutput({
+      ec2Instance, 
+      dbInstance, 
+      key,
+      userPoolAndClient,
+      distAndBucket, 
+      deploymentAppAndGroup,
+    });
   }
 
   /**
@@ -42,11 +68,10 @@ export class Plus1CloudStack extends Stack {
   createKeyPair(): KeyPair {
     // const group = iam.Group.fromGroupArn(this, 'UserGroup', 'arn:aws:iam::966727776968:group/CLIUsers');
     const group = iam.Group.fromGroupName(this, 'UserGroup', 'CLIUsers');
-
     const stackName = this.stackProps.stackName;
     const key = new KeyPair(this, `${stackName}EC2KeyPair`, {
       name: `${stackName}Key`,
-      description: 'EC2 Keypair for Plus1 EC2 instances',
+      description: `EC2 Keypair for ${stackName} EC2 instances`,
       storePublicKey: true, // Stores the public key in Secret Manager
     });
     key.grantReadOnPrivateKey(group);
@@ -54,7 +79,7 @@ export class Plus1CloudStack extends Stack {
     return key
   }
 
-  provisionVpc(): ec2.Vpc {
+  provisionVpc(): Vpc {
     const stackName = this.stackProps.stackName;
     return new ec2.Vpc(this, `${stackName}VPC`, {
       cidr: '10.0.0.0/16',
@@ -75,7 +100,7 @@ export class Plus1CloudStack extends Stack {
     });
   }
 
-  createSecurityGroups(vpc: ec2.Vpc): ec2.SecurityGroup {
+  createSecurityGroups(vpc: ec2.Vpc): SecurityGroup {
     const stackName = this.stackProps.stackName;
     const securityGroup =  new ec2.SecurityGroup(this, `${stackName}SecurityGroup`, {
       vpc, 
@@ -88,7 +113,7 @@ export class Plus1CloudStack extends Stack {
     return securityGroup;
   }
 
-  provisionEc2Instance(vpc: ec2.Vpc, securityGroup: ec2.SecurityGroup, key: KeyPair ): ec2.Instance {
+  provisionEc2Instance(vpc: Vpc, securityGroup: SecurityGroup, key: KeyPair, role: Role ): Instance {
     const machineImage = new ec2.AmazonLinuxImage({
       generation: ec2.AmazonLinuxGeneration.AMAZON_LINUX_2,
       cpuType: ec2.AmazonLinuxCpuType.X86_64,
@@ -99,7 +124,7 @@ export class Plus1CloudStack extends Stack {
       instanceType = ec2.InstanceType.of(ec2.InstanceClass.T2, ec2.InstanceSize.SMALL);
     }
   
-    return new ec2.Instance(this, `${stackName}EC2Instance`, {
+    const instance = new ec2.Instance(this, `${stackName}EC2Instance`, {
       instanceName: `${stackName}Instance`,
       vpc,
       vpcSubnets: {
@@ -110,10 +135,14 @@ export class Plus1CloudStack extends Stack {
       keyName: key.keyPairName,
       machineImage,
       securityGroup,
+      role,
     });
+
+    Tags.of(instance).add("server", this.ec2TagValue);
+    return instance;
   }
 
-  associateEipToEc2(ec2Instance: ec2.Instance) {
+  associateEipToEc2(ec2Instance: Instance) {
     const stackName = this.stackProps.stackName;
     new ec2.CfnEIPAssociation(this, `${stackName}ElasticIPAssoc`, {
       eip: this.stackConfig.elasticIp,
@@ -121,19 +150,26 @@ export class Plus1CloudStack extends Stack {
     });
   }
 
-  addUserData(ec2Instance: ec2.Instance) {
+  addUserData(ec2Instance: Instance) {
     const userDataScript = readFileSync(join(__dirname, '../src/config/config.sh'), 'utf8');
     ec2Instance.addUserData(userDataScript);
   }
 
-  provisionDbInstance(vpc: ec2.Vpc, ec2Instance: ec2.Instance): rds.DatabaseInstance {
+  provisionDbInstance(vpc: Vpc, ec2Instance: Instance): DatabaseInstance {
     const stackName = this.stackProps.stackName;
     let instanceType = ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.MICRO);
+    let multiAz = false;
+    let allocatedStorage = 20;
     if (stackName == 'Plus1Prod') {
       instanceType = ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.SMALL);
+      multiAz = true;
     }
 
-    const username = this.randomUsername(10);
+    let removalPolicy = RemovalPolicy.RETAIN;
+    if (this.stackConfig.dbRemoval) {
+      removalPolicy = RemovalPolicy.DESTROY;
+    }
+  
     const dbInstance  = new rds.DatabaseInstance(this, `${stackName}DatabaseInstance`, {
       databaseName: this.stackConfig.dbname,
       vpc, 
@@ -144,15 +180,15 @@ export class Plus1CloudStack extends Stack {
         version: rds.PostgresEngineVersion.VER_14_3,
       }),
       instanceType,
-      credentials: rds.Credentials.fromGeneratedSecret(username), // password will be auto-generated and stored in secret manager
-      multiAz: false, // use true in production 
-      allocatedStorage: 100, 
-      maxAllocatedStorage: 105,
+      credentials: rds.Credentials.fromGeneratedSecret(this.stackConfig.dbUser), // password will be auto-generated and stored in secret manager
+      multiAz, 
+      allocatedStorage, 
+      maxAllocatedStorage: 30,
       allowMajorVersionUpgrade: false,
       autoMinorVersionUpgrade: true,
       backupRetention: Duration.days(0), // set to 1 for production (default is 1)
       deleteAutomatedBackups: true, // use false for production (default is false)
-      removalPolicy: RemovalPolicy.DESTROY, // use RETAIN or SNAPSHOT in production 
+      removalPolicy,
       deletionProtection: false, // set to true in production 
       publiclyAccessible: false,
     });
@@ -161,12 +197,50 @@ export class Plus1CloudStack extends Stack {
     return dbInstance;
   }
 
-  setupOutput(ec2Instance: ec2.Instance, dbInstance:  rds.DatabaseInstance,key: KeyPair) {
-    new CfnOutput(this, 'PublicIP', { value: ec2Instance.instancePublicIp });
-    new CfnOutput(this, 'EC2KeyName', { value: key.keyPairName });
-    new CfnOutput(this, 'DBSecretName', { value: dbInstance.secret?.secretName! })
-    new CfnOutput(this, 'DBEndpoint', { value: dbInstance.dbInstanceEndpointAddress});
+  setupOutput(outputParams: IOutputParams) {
+    const {
+      ec2Instance,
+      dbInstance,
+      key,
+      userPoolAndClient,
+      distAndBucket,
+      deploymentAppAndGroup,
+    } = outputParams;
+    new CfnOutput(this, "PublicIP", {
+      value: ec2Instance.instancePublicIp,
+    });
+    new CfnOutput(this, "EC2KeyName", {
+      value: key.keyPairName,
+    });
+    new CfnOutput(this, "DBSecretName", {
+      value: dbInstance.secret?.secretName!,
+    });
+    new CfnOutput(this, "DBEndpoint", {
+      value: dbInstance.dbInstanceEndpointAddress,
+    });
+    new CfnOutput(this, "UserPoolClientId", {
+      value: userPoolAndClient.client.userPoolClientId,
+    });
+    new CfnOutput(this, "UserPoolId", {
+      value: userPoolAndClient.userPool.userPoolId,
+    });   
+    new CfnOutput(this, "DomainName", {
+      value: distAndBucket.distribution.domainName,
+    });
+    new CfnOutput(this, "s3OriginServer", {
+      value: distAndBucket.bucket.bucketName,
+    });
+    new CfnOutput(this, "DistributionId", {
+      value: distAndBucket.distribution.distributionId,
+    });
+    new CfnOutput(this, "CodeDeployApplication", {
+      value: deploymentAppAndGroup.deploymentApp.applicationName || "",
+    });
+    new CfnOutput(this, "CodeDeployGroup", {
+      value: deploymentAppAndGroup.deploymentGroup.deploymentGroupName || "",
+    });
   }
+  
   /* 
    * @override: limits the availability zones that could be selected
    */
@@ -183,15 +257,5 @@ export class Plus1CloudStack extends Stack {
       throw new Error(`null or unsupported stack name: ${stackName}`);
     }
     return stackConfig as IStackEnv;
-  }
-
-  randomUsername(len: number): string {
-    let result = '';
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    const charLen = chars.length;
-    for (let i = 0; i < len; i++ ) {
-      result += chars.charAt(Math.floor(Math.random() * charLen));
-    }
-    return result;
   }
 }

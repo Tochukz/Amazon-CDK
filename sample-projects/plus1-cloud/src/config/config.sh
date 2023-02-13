@@ -1,6 +1,6 @@
 #!/bin/bash
 # Filename: config.sh
-# Task: Install LAMP stack on AmazonLinux2 EC2 instance
+# Task: Install dependencies for backend
 
 echo OS Version: 
 cat /etc/os-release
@@ -10,19 +10,27 @@ sudo yum update -y
 ## Install Nginx
 sudo amazon-linux-extras install nginx1 -y
 sudo service nginx start
+
 # Enable Nginx to start at Boot time
 sudo chkconfig nginx o
 
 ## Install PostgreSQL client (psql)
 sudo amazon-linux-extras install postgresql10 -y
 
-## Install Node.js and 
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.34.0/install.sh | bash
-. ~/.nvm/nvm.sh
-nvm install 16.17.1
+## Install Code Deploy 
+sudo yum install ruby -y
+sudo yum install wget -y
+cd /home/ec2-user
+wget https://aws-codedeploy-eu-west-2.s3.eu-west-2.amazonaws.com/latest/install
+chmod +x ./install
+sudo ./install auto
+# check that the service is running
+sudo service codedeploy-agent status 
 
-## 
-npm install -g yarn
-npm install -g pm2@latest
+## Install git 
+sudo yum install git 
 
-# echo 127.0.0.1 site.mydomain.com >> /etc/hosts
+## Install Certbot and certbot nginx plugin
+sudo amazon-linux-extras install epel -y
+sudo yum install certbot -y
+sudo yum install python-certbot-nginx -y

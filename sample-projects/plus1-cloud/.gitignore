@@ -7,3 +7,6 @@ node_modules
 .cdk.staging
 cdk.out
 *result*.*
+output/*.txt
+output/*.json
+output/*.env 
