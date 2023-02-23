@@ -66,7 +66,7 @@ __IDE Plugin__
 Install the AWS Toolkit for Visual Studio Code extension if you are using VSCode.
 The toolkit provides an integrated experience for developing AWS CDK applications, including the AWS CDK Explorer feature to list your AWS CDK projects and browse the various components of the CDK application. [AWS Toolkit for Visual Studio Code](https://aws.amazon.com/visualstudiocode/)
 
-__Local Stack__   
+### Local Stack
 LocalStack is a cloud service emulator that runs in a single container on your local machine or in your CI environment.  
 To install LocalStack you first need to install `Python 3`, and Docker. `pip` the python package manager will be used to install LocalStack  
 [Getting Started with LocalStack ](https://docs.localstack.cloud/get-started/)   
@@ -89,6 +89,7 @@ $ python --version
 2. Install Docker desktop from [docker for desktop](https://docs.docker.com/desktop/)  
 3. Install LocalStack
 ```bash
+# you may need to run pip on a new terminal window because it was just newly to you path and needs to take effect.  
 # you may need to update pip before installing localstack
 $ pip install --upgrade pip
 $ pip install localstack
@@ -102,14 +103,58 @@ $ localstack start -d
 $ localstack status
 $ localstack status services
 ```
-6. Install `awslocal`  
+
+#### LocalStack integration  
+__AWS CDK CLI for AWS CLI__  
+`awslocal` is a thin wrapper and drop-in replacement for the `aws` command that runs commands directly againt LocalStack. 
+1. Install `awslocal`  
 ```
 $ pip install awscli-local
 ```
-7. You can then use `awslocal` in place of `aws`
+2. You can then use `awslocal` in place of `aws`
 ```
 $ awslocal ec2 describe-instances
 ```
+
+__AWS CDK CLI for LocalStack__    
+`cdklocal` is a think wrapper script for using the AWS CDK library againt local API provided by LocalStack 
+1. Install  `cdklocal`
+```
+$ npm install -g aws-cdk-local aws-cdk
+$ cdklocal --version
+```
+2. Check if LocalStack is running
+```bash
+$ curl http://localhost:4566/_localstack/health
+## if not, start localstack
+$ localstack start -d
+```
+3. You can use `cdklocal` to generate a app scaffolding same way you can with the real `cdk`  CLI tool. 
+```
+$ mkdir local-app 
+$ cd local-app 
+$ cdklocal init sample-app --language=javascript 
+```
+4. Bootstrap the `cdklocal` for LocalStack environment 
+```
+$ cdklocal bootstrap 
+```
+5. Deploy the newly create app to LocalStack 
+```
+$ cd local-app 
+$ cdklocal diff
+$ cdklocal deploy
+```  
+
+__Destroy the local infrastrcuture__ 
+To cleanup and tear down the resoruces that are part of the project
+```
+$ localstack destory 
+```
+LocalStack is ephemeral in nature and will not persist ant data across restarts. To persist data across restarts, consider looking at localstack's _[perstense mechanism documentation](docs.localstack.cloud/references/persistence-mechanism)  
+
+For more about AWS CDK integraton, see [LocalStack - AWS CDK integration](https://docs.localstack.cloud/user-guide/integrations/aws-cdk/)  
+To learn how to integrate LocalStack to other Infrastructure as Code tools see [User Guide - Integrations](https://docs.localstack.cloud/user-guide/integrations/)
 
 __References__   
 [Working with the AWS CDK in TypeScript](https://docs.aws.amazon.com/cdk/v2/guide/work-with-cdk-typescript.html)   
@@ -125,7 +170,7 @@ $ mkdir cloud-app
 ```
 2. Create the app from a template provided by the AWS CDK.
 ```
-$ cs cloud-app
+$ cd  cloud-app
 $ cdk  init app --language typescript
 ```
 _app_ is the name of the template used. Other templates are _sample-app_ and _lib_.  
@@ -176,11 +221,11 @@ Command         | Description
 `cdk synth`     | emits the synthesized CloudFormation template  
 `cdk deploy`    | deploy this stack to your default AWS account/region
 `cdk diff`      | compare deployed stack with current state
-`cdk doctor` | Checks your CDK project for potential problems
-`cdk metadata` | Displays metadata about the specified stack
-`cdk context` | Manages cached context values
+`cdk doctor`    | Checks your CDK project for potential problems
+`cdk metadata`  | Displays metadata about the specified stack
+`cdk context`   | Manages cached context values
 `cdk init sample-app` | Create new CDK app using the _sample-app_ template
-`cdk init --list ` | Shows the list of available template
+`cdk init --list `| Shows the list of available template
 
 Learn more at [AWS ToolKit CLI](https://docs.aws.amazon.com/cdk/v2/guide/cli.html)
 

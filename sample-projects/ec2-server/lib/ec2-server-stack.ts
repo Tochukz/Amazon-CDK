@@ -1,3 +1,4 @@
+import { join } from 'path';
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
@@ -7,6 +8,7 @@ import * as autoscaling from 'aws-cdk-lib/aws-autoscaling';
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import { KeyPair } from 'cdk-ec2-key-pair';
+import { ManagedPolicy, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
 
 export class Ec2ServerStack extends cdk.Stack {
 
@@ -49,27 +51,27 @@ export class Ec2ServerStack extends cdk.Stack {
       minCapacity: 2,
       instanceType: new ec2.InstanceType('t2.micro'),
       desiredCapacity: 3,
+      keyName: 'AmzLinuxKey2'
     });
     return cluster;
   }
 
-  addEC2AutoScaling(vpc: ec2.Vpc, cluster: ecs.Cluster, key: KeyPair) {
+  addEC2AutoScaling(vpc: ec2.Vpc, cluster: ecs.Cluster) { //  key: KeyPair
     const isProd = true;
     if (!isProd) {
       return;
     }
 
+    const role = new iam.Role(this, 'LaunchTemplateRole', { 
+      assumedBy: new ServicePrincipal('ec2.amazonaws.com'),
+    });
+    role.addManagedPolicy(ManagedPolicy.fromAwsManagedPolicyName('AmazonEC2FullAccess'));
     const launchTemplate = new ec2.LaunchTemplate(this, 'ASGLaunchTemplate', {
       instanceType: new ec2.InstanceType('t2.micro'),
       machineImage: ecs.EcsOptimizedImage.amazonLinux2(),
       userData: ec2.UserData.forLinux(),
       // keyName: key.keyPairName,
-      role: new iam.Role(this, 'LaunchRole', { 
-        assumedBy: {
-          assumeRoleAction: '', 
-          policyFragment: ''
-        }
-      }),
+      role,
     });
 
     const autoScalingGroup = new autoscaling.AutoScalingGroup(this, "ProdAutoScaling", {
@@ -81,6 +83,9 @@ export class Ec2ServerStack extends cdk.Stack {
         launchTemplate
       }
     });
+
+    const bashScript = 'docker plugin install rexray/ebs REXRAY_PREEMPT=true EBS_REGION=eu-west-1 --grant-all-permissions \nstop ecs \nstart ecs';
+    autoScalingGroup.addUserData(bashScript);
     
     const capacityProvider = new ecs.AsgCapacityProvider(this, "StackCapacityProvider", {
       autoScalingGroup,
@@ -102,19 +107,20 @@ export class Ec2ServerStack extends cdk.Stack {
         stage: 'Prod'
       },
       environmentFiles: [
-        ecs.EnvironmentFile.fromAsset('./app.env')
+        ecs.EnvironmentFile.fromAsset(join(__dirname, './app.env'))
       ],
       secrets: {
        // DB_PASSWORD: ecs.Secret.fromSecretsManager(secretsmanager.Secret, "password")
       },
-    //  logging: new ecs.AwsLogDriver({ streamPrefix: 'EventDemo', mode: ecs.AwsLogDriverMode.NON_BLOCKING})
+      // logging: new ecs.AwsLogDriver({ streamPrefix: 'EventDemo', mode: ecs.AwsLogDriverMode.NON_BLOCKING})
     });
-    taskDefinition.addVolume({
-      name: 'AppVolume',
-      efsVolumeConfiguration: {
-        fileSystemId: 'EFS'
-      }
-    });
+    
+    // taskDefinition.addVolume({
+    //   name: 'AppVolume',
+    //   efsVolumeConfiguration: {
+    //     fileSystemId: 'EFS'
+    //   }
+    // });
     return taskDefinition;
   }
 
@@ -123,7 +129,7 @@ export class Ec2ServerStack extends cdk.Stack {
       cluster,
       taskDefinition,
       desiredCount: 2,
-      assignPublicIp: true,
+    //  assignPublicIp: true,
      // vpcSubnets: ec2.SubnetType,
      // securityGroups: 
      circuitBreaker: { rollback: true}
@@ -142,15 +148,15 @@ export class Ec2ServerStack extends cdk.Stack {
       targets: [service]
     });
     /** For more control on the container being used */
-    const targetGroup2 = listener.addTargets('ECS2', {
-      port: 80,
-      targets: [
-        service.loadBalancerTarget({
-          containerName: 'AppContainer',
-          containerPort: 8080
-        })
-      ]
-    });
+    // const targetGroup2 = listener.addTargets('ECS2', {
+    //   port: 80,
+    //   targets: [
+    //     service.loadBalancerTarget({
+    //       containerName: 'AppContainer',
+    //       containerPort: 8080
+    //     })
+    //   ]
+    // });
 
     return targetGroup1;
     // return targetGroup2;

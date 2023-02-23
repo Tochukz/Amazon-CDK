@@ -89,6 +89,7 @@ export class FrontendResources {
     if (process.env.NODE_ENV != "local") {
       return;
     }
+    //Todo: frontend asset is not deployed to the S3 orgin server. Please fix. 
     const assetPath = this.config.assetPath; //path.join(__dirname, "..", this.config.assetPath);
     console.log('assetPath', assetPath);
 
