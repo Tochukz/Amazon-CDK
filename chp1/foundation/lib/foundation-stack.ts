@@ -7,7 +7,7 @@ export class FoundationStack extends cdk.Stack {
 
     // The code that defines your stack goes here
     new s3.Bucket(this, "MyFirstBucket", {
-      bucketName: "hello-aws-cdk-my-first-bucket",
+      bucketName: "foundation-stack-bucket-1",
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
   }

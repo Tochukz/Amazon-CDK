@@ -87,6 +87,10 @@ $ pyenv global 3.9.2
 $ python --version
 ```  
 2. Install Docker desktop from [docker for desktop](https://docs.docker.com/desktop/)  
+```bash
+# Check that docker is runnint 
+$ docker ps
+```
 3. Install LocalStack
 ```bash
 # you may need to run pip on a new terminal window because it was just newly to you path and needs to take effect.  
@@ -156,6 +160,22 @@ LocalStack is ephemeral in nature and will not persist ant data across restarts.
 For more about AWS CDK integraton, see [LocalStack - AWS CDK integration](https://docs.localstack.cloud/user-guide/integrations/aws-cdk/)  
 To learn how to integrate LocalStack to other Infrastructure as Code tools see [User Guide - Integrations](https://docs.localstack.cloud/user-guide/integrations/)
 
+__Cloudformation templates__  
+Cloudformation templates are generated or _synthesized_ using the _cdk synth_ command.  
+This template can then be deployed using _aws cloudformation_ after running `cdk synth`. 
+```bash
+$ cdk synth 
+$  aws cloudformation deploy --stack-name foundation-stack  --template-file ./cdk.out/FoundationStack.template.json
+# list stacks by name
+$ aws cloudformation list-stacks --query 'StackSummaries[*].StackName' 
+$ aws cloudformation list-stack-resources --stack-name foundation-stack 
+# incase of failure, check events leading to failure 
+$ aws cloudformation describe-stack-events --stack-name foundation-stack 
+``` 
+During cleanup time the stack can then be destroyed
+```bash
+$ aws cloudformation destroy --stack-name foundation-stack
+```
 __References__   
 [Working with the AWS CDK in TypeScript](https://docs.aws.amazon.com/cdk/v2/guide/work-with-cdk-typescript.html)   
 [AWS CDK Toolkit (cdk command)](https://docs.aws.amazon.com/cdk/v2/guide/cli.html)  

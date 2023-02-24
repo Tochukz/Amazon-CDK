@@ -22,7 +22,7 @@ class LocalCloudStack extends cdk.Stack {
     topic.addSubscription(new subs.SqsSubscription(queue));
 
     new s3.Bucket(this, "MyFirstBucket", {
-      bucketName: "hello-aws-cdk-my-first-bucket",
+      bucketName: "local-cloud-bucket",
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
   }
