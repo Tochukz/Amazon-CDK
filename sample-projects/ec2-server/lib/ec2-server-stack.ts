@@ -1,171 +1,102 @@
-import { join } from 'path';
 import * as cdk from 'aws-cdk-lib';
-import { Construct } from 'constructs';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
-import * as ecs from 'aws-cdk-lib/aws-ecs';
-import * as iam from 'aws-cdk-lib/aws-iam';
+import * as elb2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import * as autoscaling from 'aws-cdk-lib/aws-autoscaling';
-import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
-import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
-import { KeyPair } from 'cdk-ec2-key-pair';
-import { ManagedPolicy, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
+import { Construct } from 'constructs';
 
+
+type Vpc = ec2.Vpc;
+type ApplicationLoadBalancer = elb2.ApplicationLoadBalancer;
+type AutoScalingGroup = autoscaling.AutoScalingGroup;
 export class Ec2ServerStack extends cdk.Stack {
-
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
-    
-    const vpc = this.createVpc();
 
-    const cluster = this.createCluster(vpc);
-    
+    const vpc = this.provisionVpc();
 
-    this.addEC2AutoScaling(vpc, cluster)
-   
-    const taskDefinition = this.createTaskDefinition();
+    const applLoadBalancer = this.provisionLoadBalancer(vpc);
 
-    /** Create an ECS service  */
-    const ecsService  = this.createService(cluster, taskDefinition);
+    const autoScalingGroup = this.provisionAutoScalingGroup(vpc);
 
-    const targetGroup = this.createLoadBalancer(vpc, ecsService);
-
-    this.addServiceAutoScaling(ecsService, targetGroup);
+    this.provisionListeners(applLoadBalancer, autoScalingGroup);
+  
+    this.output(applLoadBalancer);
   }
 
-  createVpc(): ec2.Vpc {
-    return new ec2.Vpc(this, 'Ec2StackVpc', {
-      natGateways: 0,
-      cidr: '10.0.0.0/16',
-      maxAzs: 2,
-    });
+  provisionVpc(): Vpc {
+    return new ec2.Vpc(this, `${this.stackName}Vpc`, { natGateways: 1});
   }
 
-  createCluster(vpc: ec2.Vpc): ecs.Cluster {
-    const cluster = new ecs.Cluster(this, 'Ec2StackCluster', {
-      clusterName: 'ServerCluster',
-      vpc,
-    });
-
-    /** The default machineImage will be used which is an automatically updated, ECS-optimized Amazon Linux 2 */
-    cluster.addCapacity('ClusterCapacity', {
-      minCapacity: 2,
-      instanceType: new ec2.InstanceType('t2.micro'),
-      desiredCapacity: 3,
-      keyName: 'AmzLinuxKey2'
-    });
-    return cluster;
-  }
-
-  addEC2AutoScaling(vpc: ec2.Vpc, cluster: ecs.Cluster) { //  key: KeyPair
-    const isProd = true;
-    if (!isProd) {
-      return;
-    }
-
-    const role = new iam.Role(this, 'LaunchTemplateRole', { 
-      assumedBy: new ServicePrincipal('ec2.amazonaws.com'),
-    });
-    role.addManagedPolicy(ManagedPolicy.fromAwsManagedPolicyName('AmazonEC2FullAccess'));
-    const launchTemplate = new ec2.LaunchTemplate(this, 'ASGLaunchTemplate', {
-      instanceType: new ec2.InstanceType('t2.micro'),
-      machineImage: ecs.EcsOptimizedImage.amazonLinux2(),
-      userData: ec2.UserData.forLinux(),
-      // keyName: key.keyPairName,
-      role,
-    });
-
-    const autoScalingGroup = new autoscaling.AutoScalingGroup(this, "ProdAutoScaling", {
+  provisionLoadBalancer(vpc: Vpc): ApplicationLoadBalancer {
+    return new elb2.ApplicationLoadBalancer(this, `${this.stackName}AppLoadBalancer`, {
       vpc, 
-      mixedInstancesPolicy: {
-        instancesDistribution: {
-          onDemandPercentageAboveBaseCapacity: 50,
-        },
-        launchTemplate
+      internetFacing: true,
+    });
+  }
+
+  provisionAutoScalingGroup(vpc: Vpc): AutoScalingGroup {
+    const userData = ec2.UserData.forLinux();
+    userData.addCommands(
+      'sudo yum update -y',
+      'sudo amazon-linux-extras install nginx1 -y',
+      'sudo service nginx start',    
+      'sudo chkconfig nginx o ',
+      'echo "<h1>Hello world from ${hostname -f}</h1>" /var/www/html/index.html'
+    );
+
+    const stackName = this.stackName;
+    const autoScalingGroup =  new autoscaling.AutoScalingGroup(this, `${stackName}AutoScalingGroup`, {
+      vpc, 
+      instanceType: ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE2, ec2.InstanceSize.NANO),
+      machineImage: new ec2.AmazonLinuxImage({
+        generation: ec2.AmazonLinuxGeneration.AMAZON_LINUX_2
+      }),
+      userData,
+      minCapacity: 2, 
+      maxCapacity: 3,
+    });
+    
+    return autoScalingGroup;
+  }
+
+  provisionListeners(loadBalancer: ApplicationLoadBalancer, autoScalingGroup: AutoScalingGroup) {
+    const stackName = this.stackName;
+    const listener = loadBalancer.addListener(`${stackName}Listener`, {
+      port: 80,
+      open: true,
+    });
+
+    listener.addTargets(`${stackName}DefaultTarget`, {
+      port: 80, 
+      targets: [ autoScalingGroup ],
+      healthCheck: {
+        path: '/',
+        unhealthyThresholdCount: 2, 
+        healthyThresholdCount: 5, 
+        interval: cdk.Duration.seconds(30),
       }
     });
 
-    const bashScript = 'docker plugin install rexray/ebs REXRAY_PREEMPT=true EBS_REGION=eu-west-1 --grant-all-permissions \nstop ecs \nstart ecs';
-    autoScalingGroup.addUserData(bashScript);
-    
-    const capacityProvider = new ecs.AsgCapacityProvider(this, "StackCapacityProvider", {
-      autoScalingGroup,
-      machineImageType: ecs.MachineImageType.AMAZON_LINUX_2,
-    });
+    listener.addAction('/static', {
+      priority: 5,
+      conditions: [ elb2.ListenerCondition.pathPatterns(['/static'])],
+      action: elb2.ListenerAction.fixedResponse(200, {
+        contentType: 'text/html',
+        messageBody: '<h1>Static ALB Response</h1>',
+      })
+    })
 
-    cluster.addAsgCapacityProvider(capacityProvider);
+    autoScalingGroup.scaleOnRequestCount(`${stackName}ScaleOnRequstRate`, {
+      targetRequestsPerMinute: 60,
+     });
+     autoScalingGroup.scaleOnCpuUtilization(`${stackName}ScaleOnCpuUsage`, {
+       targetUtilizationPercent: 75,
+     });
   }
 
-  createTaskDefinition(): ecs.Ec2TaskDefinition {
-    const taskDefinition = new ecs.Ec2TaskDefinition(this, 'AppTaskDefinition', {
-      // networkMode: ecs.NetworkMode.BRIDGE,
-    });
-    taskDefinition.addContainer('DefaultContainer', {
-      image: ecs.ContainerImage.fromRegistry("amazon/amazon-ecs-sample"),
-      memoryLimitMiB: 512,
-      portMappings: [{ containerPort: 8081}],
-      environment: {
-        stage: 'Prod'
-      },
-      environmentFiles: [
-        ecs.EnvironmentFile.fromAsset(join(__dirname, './app.env'))
-      ],
-      secrets: {
-       // DB_PASSWORD: ecs.Secret.fromSecretsManager(secretsmanager.Secret, "password")
-      },
-      // logging: new ecs.AwsLogDriver({ streamPrefix: 'EventDemo', mode: ecs.AwsLogDriverMode.NON_BLOCKING})
-    });
-    
-    // taskDefinition.addVolume({
-    //   name: 'AppVolume',
-    //   efsVolumeConfiguration: {
-    //     fileSystemId: 'EFS'
-    //   }
-    // });
-    return taskDefinition;
-  }
-
-  createService(cluster: ecs.Cluster, taskDefinition: ecs.Ec2TaskDefinition): ecs.Ec2Service {
-    return  new ecs.Ec2Service(this, 'Service', {
-      cluster,
-      taskDefinition,
-      desiredCount: 2,
-    //  assignPublicIp: true,
-     // vpcSubnets: ec2.SubnetType,
-     // securityGroups: 
-     circuitBreaker: { rollback: true}
-    });
-  }
-
-  createLoadBalancer(vpc: ec2.Vpc, service: ecs.Ec2Service): elbv2.ApplicationTargetGroup {
-    const loadBalancer  = new elbv2.ApplicationLoadBalancer(this, 'AppLoadBalancer', {
-      vpc,
-      internetFacing: true,
-    });
-
-    const listener = loadBalancer.addListener('LBListener', {port: 80});
-    const targetGroup1 = listener.addTargets('ECS1', {
-      port: 80,
-      targets: [service]
-    });
-    /** For more control on the container being used */
-    // const targetGroup2 = listener.addTargets('ECS2', {
-    //   port: 80,
-    //   targets: [
-    //     service.loadBalancerTarget({
-    //       containerName: 'AppContainer',
-    //       containerPort: 8080
-    //     })
-    //   ]
-    // });
-
-    return targetGroup1;
-    // return targetGroup2;
-  }
-
-  addServiceAutoScaling(service: ecs.Ec2Service, targetGroup: elbv2.ApplicationTargetGroup) {
-    const scaling  = service.autoScaleTaskCount({maxCapacity: 5});
-    scaling.scaleOnCpuUtilization('CPU_Scaling', { targetUtilizationPercent: 50});
-    scaling.scaleOnMemoryUtilization('MemoryScaling', { targetUtilizationPercent: 50});
-    scaling.scaleOnRequestCount('RequestScaling', { requestsPerTarget: 10000, targetGroup});
+  output(loadBalancer: ApplicationLoadBalancer) {
+    new cdk.CfnOutput(this, 'LoadBalacnerDns', {
+      value: loadBalancer.loadBalancerDnsName,
+    })
   }
 }
