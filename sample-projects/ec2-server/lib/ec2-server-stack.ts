@@ -19,7 +19,7 @@ export class Ec2ServerStack extends cdk.Stack {
     const autoScalingGroup = this.provisionAutoScalingGroup(vpc);
 
     this.provisionListeners(applLoadBalancer, autoScalingGroup);
-  
+
     this.output(applLoadBalancer);
   }
 
@@ -29,7 +29,7 @@ export class Ec2ServerStack extends cdk.Stack {
 
   provisionLoadBalancer(vpc: Vpc): ApplicationLoadBalancer {
     return new elb2.ApplicationLoadBalancer(this, `${this.stackName}AppLoadBalancer`, {
-      vpc, 
+      vpc,
       internetFacing: true,
     });
   }
@@ -39,23 +39,23 @@ export class Ec2ServerStack extends cdk.Stack {
     userData.addCommands(
       'sudo yum update -y',
       'sudo amazon-linux-extras install nginx1 -y',
-      'sudo service nginx start',    
+      'sudo service nginx start',
       'sudo chkconfig nginx o ',
       'echo "<h1>Hello world from ${hostname -f}</h1>" /var/www/html/index.html'
     );
 
     const stackName = this.stackName;
     const autoScalingGroup =  new autoscaling.AutoScalingGroup(this, `${stackName}AutoScalingGroup`, {
-      vpc, 
+      vpc,
       instanceType: ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE2, ec2.InstanceSize.NANO),
       machineImage: new ec2.AmazonLinuxImage({
         generation: ec2.AmazonLinuxGeneration.AMAZON_LINUX_2
       }),
       userData,
-      minCapacity: 2, 
+      minCapacity: 2,
       maxCapacity: 3,
     });
-    
+
     return autoScalingGroup;
   }
 
@@ -67,12 +67,12 @@ export class Ec2ServerStack extends cdk.Stack {
     });
 
     listener.addTargets(`${stackName}DefaultTarget`, {
-      port: 80, 
+      port: 80,
       targets: [ autoScalingGroup ],
       healthCheck: {
         path: '/',
-        unhealthyThresholdCount: 2, 
-        healthyThresholdCount: 5, 
+        unhealthyThresholdCount: 2,
+        healthyThresholdCount: 5,
         interval: cdk.Duration.seconds(30),
       }
     });
@@ -95,7 +95,7 @@ export class Ec2ServerStack extends cdk.Stack {
   }
 
   output(loadBalancer: ApplicationLoadBalancer) {
-    new cdk.CfnOutput(this, 'LoadBalacnerDns', {
+    new cdk.CfnOutput(this, 'LoadBalancerDns', {
       value: loadBalancer.loadBalancerDnsName,
     })
   }
