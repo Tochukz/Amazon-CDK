@@ -17,24 +17,26 @@ type Vpc = ec2.Vpc;
 type Cluster =  ecs.Cluster;
 type Ec2TaskDefinition = ecs.Ec2TaskDefinition;
 type Ec2Service = ecs.Ec2Service;
+type LoadBalancer = elbv2.ApplicationLoadBalancer;
 export class Ec2ContainersStack extends cdk.Stack {
 
-  containerName: 'WebAppContainer';
+  containerName: 'express-app';
 
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
-    
+
     const vpc = this.provisionVpc();
     const cluster = this.provisionCluster(vpc);
     const task  = this.createTask();
-    const service = this.createService(vpc, cluster, task);
+    const loadbalancer = this.createService(vpc, cluster, task);
+    this.output(loadbalancer);
   }
 
   provisionVpc(): Vpc {
     return new ec2.Vpc(this, `${this.stackName}Vpc`, {
       cidr: '10.0.0.0/16',
       natGateways: 0,
-      maxAzs: 2, 
+      maxAzs: 2,
       subnetConfiguration: [
         {
           cidrMask: 24,
@@ -72,17 +74,19 @@ export class Ec2ContainersStack extends cdk.Stack {
     });
     // const image =  ecs.ContainerImage.fromRegistry('amazon/amazon-ecs-sample');
     // const image = ecs.ContainerImage.fromEcrRepository();
-    const image = ecs.ContainerImage.fromAsset('./image');
-    
+    const dockerDir = join(__dirname, '../../../express-app')
+    const image = ecs.ContainerImage.fromAsset(dockerDir);
+
     taskDefinition.addContainer(`${this.stackName}DefaultContainer`, {
       image,
+      containerName: this.containerName,
       memoryLimitMiB: 512,
-      portMappings: [{ containerPort: 80}],
+      portMappings: [{ containerPort: 8080 }],
       environment: {
         NODE_ENV: 'development'
-      },      
+      },
       environmentFiles: [
-        ecs.EnvironmentFile.fromAsset('./.env'),
+        ecs.EnvironmentFile.fromAsset(`${dockerDir}/development.env`),
       ],
       // secrets: {
       //   SECRET: ecs.Secret.fromSecretsManager(secret),
@@ -90,34 +94,28 @@ export class Ec2ContainersStack extends cdk.Stack {
     });
     taskDefinition.addVolume({
       name: `${this.stackName}DataVolume`,
-      efsVolumeConfiguration: {
-        fileSystemId: "EFS",
-      }
     })
     return taskDefinition
   }
 
-  createService(vpc: Vpc, cluster: Cluster, taskDefinition: Ec2TaskDefinition): Ec2Service {
+  createService(vpc: Vpc, cluster: Cluster, taskDefinition: Ec2TaskDefinition): LoadBalancer {
     const service =  new ecs.Ec2Service(this, `${this.stackName}Service`, {
-      cluster, 
+      cluster,
       taskDefinition,
       desiredCount: 2,
       // securityGroups: []
       circuitBreaker: { rollback: true}
     });
 
-    const loadbalancer = new elbv2.ApplicationLoadBalancer(this, `${this.stackName}LB`, {
-      vpc, 
+    const loadBalancer = new elbv2.ApplicationLoadBalancer(this, `${this.stackName}LB`, {
+      vpc,
       internetFacing: true,
     });
-    const listener = loadbalancer.addListener(`${this.stackName}Listener`, { port: 80 });
+    const listener = loadBalancer.addListener(`${this.stackName}Listener`, { port: 80 });
     const targetGroup = listener.addTargets(`${this.stackName}Target`, {
       port: 80,
-      targets: [
-        service.loadBalancerTarget({
-          containerName: this.containerName,
-          containerPort: 8080
-        }),
+      targets: [ 
+        service
       ],
     });
 
@@ -129,10 +127,12 @@ export class Ec2ContainersStack extends cdk.Stack {
       requestsPerTarget: 1000,
       targetGroup,
     })
-    return service;
+    return loadBalancer;
   }
 
-  output() {
-     
+  output(loadBalancer: LoadBalancer) {
+    new cdk.CfnOutput(this, 'LoadBalancerDns', {
+      value: loadBalancer.loadBalancerDnsName,
+    });
   }
 }

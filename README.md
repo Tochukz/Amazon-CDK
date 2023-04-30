@@ -1,6 +1,6 @@
 # AWS Cloud Development Kit  
-[AWS CDS User Guide](https://docs.aws.amazon.com/cdk/v2/guide/getting_started.html)  
-[AWS CDK API References](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-construct-library.html)
+[User Guide](https://docs.aws.amazon.com/cdk/v2/guide/getting_started.html)  
+[API References](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-construct-library.html)
 
 ## Chapter 1: Getting started
 The output of an AWS CDK program is an AWS CloudFormation template.  
@@ -88,7 +88,7 @@ $ python --version
 ```  
 2. Install Docker desktop from [docker for desktop](https://docs.docker.com/desktop/)  
 ```bash
-# Check that docker is runnint 
+# Check that docker is runnint
 $ docker ps
 ```
 3. Install LocalStack
@@ -110,7 +110,7 @@ $ localstack status services
 
 #### LocalStack integration  
 __AWS CDK CLI for AWS CLI__  
-`awslocal` is a thin wrapper and drop-in replacement for the `aws` command that runs commands directly againt LocalStack. 
+`awslocal` is a thin wrapper and drop-in replacement for the `aws` command that runs commands directly againt LocalStack.
 1. Install `awslocal`  
 ```
 $ pip install awscli-local
@@ -121,7 +121,7 @@ $ awslocal ec2 describe-instances
 ```
 
 __AWS CDK CLI for LocalStack__    
-`cdklocal` is a think wrapper script for using the AWS CDK library againt local API provided by LocalStack 
+`cdklocal` is a think wrapper script for using the AWS CDK library againt local API provided by LocalStack
 1. Install  `cdklocal`
 ```
 $ npm install -g aws-cdk-local aws-cdk
@@ -133,27 +133,27 @@ $ curl http://localhost:4566/_localstack/health
 ## if not, start localstack
 $ localstack start -d
 ```
-3. You can use `cdklocal` to generate a app scaffolding same way you can with the real `cdk`  CLI tool. 
+3. You can use `cdklocal` to generate a app scaffolding same way you can with the real `cdk`  CLI tool.
 ```
-$ mkdir local-app 
-$ cd local-app 
-$ cdklocal init sample-app --language=javascript 
+$ mkdir local-app
+$ cd local-app
+$ cdklocal init sample-app --language=javascript
 ```
-4. Bootstrap the `cdklocal` for LocalStack environment 
+4. Bootstrap the `cdklocal` for LocalStack environment
 ```
-$ cdklocal bootstrap 
+$ cdklocal bootstrap
 ```
-5. Deploy the newly create app to LocalStack 
+5. Deploy the newly create app to LocalStack
 ```
-$ cd local-app 
+$ cd local-app
 $ cdklocal diff
 $ cdklocal deploy
 ```  
 
-__Destroy the local infrastrcuture__ 
+__Destroy the local infrastrcuture__
 To cleanup and tear down the resoruces that are part of the project
 ```
-$ localstack destory 
+$ localstack destory
 ```
 LocalStack is ephemeral in nature and will not persist ant data across restarts. To persist data across restarts, consider looking at localstack's _[perstense mechanism documentation](docs.localstack.cloud/references/persistence-mechanism)  
 
@@ -162,16 +162,16 @@ To learn how to integrate LocalStack to other Infrastructure as Code tools see [
 
 __Cloudformation templates__  
 Cloudformation templates are generated or _synthesized_ using the _cdk synth_ command.  
-This template can then be deployed using _aws cloudformation_ after running `cdk synth`. 
+This template can then be deployed using _aws cloudformation_ after running `cdk synth`.
 ```bash
-$ cdk synth 
+$ cdk synth
 $  aws cloudformation deploy --stack-name foundation-stack  --template-file ./cdk.out/FoundationStack.template.json
 # list stacks by name
-$ aws cloudformation list-stacks --query 'StackSummaries[*].StackName' 
-$ aws cloudformation list-stack-resources --stack-name foundation-stack 
-# incase of failure, check events leading to failure 
-$ aws cloudformation describe-stack-events --stack-name foundation-stack 
-``` 
+$ aws cloudformation list-stacks --query 'StackSummaries[*].StackName'
+$ aws cloudformation list-stack-resources --stack-name foundation-stack
+# incase of failure, check events leading to failure
+$ aws cloudformation describe-stack-events --stack-name foundation-stack
+```
 During cleanup time the stack can then be destroyed
 ```bash
 $ aws cloudformation destroy --stack-name foundation-stack
