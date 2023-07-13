@@ -329,3 +329,30 @@ AWS CDK apps are composed of building blocks known as Constructs, which are comp
 
 ## Chapter 5: Writing Constructs
 [Workshop  d](https://cdkworkshop.com/20-typescript/40-hit-counter.html)
+
+
+## Learn More
+### AWS Perspective Guidance
+#### Aspects
+Aspects are a way to apply an operation to all constructs in a given scope.  
+The aspect could modify the constructs, such as by adding tags. Or it could verify something about the state of the constructs, such as making sure that all buckets are encrypted.
+```
+import * as cdk from 'aws-cdk-lib';
+import { MyCDKApp } from "../lib/my-cdk-app";
+
+const app = new cdk.App();
+cdk.Aspects.of(app).add(new MyCDKApp());
+```
+To lean more see [aspects](https://docs.aws.amazon.com/cdk/v2/guide/aspects.html)  
+
+#### CDK Nag
+Use the _cdk-nag_ utility to check AWS Cloud Development Kit (AWS CDK) applications for best practices by using a combination of rule packs.  
+You can check your AWS CDK applications for best practices by using the rules in these packs, detect and remediate code based on best practices, and suppress the rules that you don’t want to use in your evaluations.
+
+__Install cdk-nag__  
+Install a version of _cdk-nag_ that is compatible with the already installed version of _aws-cdk-lib_. For _asw-cdk-lib@2.44.0_, i instelled _cdk-nag@2.18_.  
+```
+$ npm install cdk-nag@2.18
+```  
+[Check AWS CDK application](https://docs.aws.amazon.com/prescriptive-guidance/latest/patterns/check-aws-cdk-applications-or-cloudformation-templates-for-best-practices-by-using-cdk-nag-rule-packs.html)  
+[CDK Nag Github](https://github.com/cdklabs/cdk-nag)
