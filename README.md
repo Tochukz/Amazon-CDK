@@ -353,6 +353,25 @@ __Install cdk-nag__
 Install a version of _cdk-nag_ that is compatible with the already installed version of _aws-cdk-lib_. For _asw-cdk-lib@2.44.0_, i instelled _cdk-nag@2.18_.  
 ```
 $ npm install cdk-nag@2.18
-```  
+```   
+
+After setting up _cdk-nag_ on your CDK project, any violations in your code will trigger warning and error messages when you run _cdk diff_.  
+
 [Check AWS CDK application](https://docs.aws.amazon.com/prescriptive-guidance/latest/patterns/check-aws-cdk-applications-or-cloudformation-templates-for-best-practices-by-using-cdk-nag-rule-packs.html)  
 [CDK Nag Github](https://github.com/cdklabs/cdk-nag)
+
+### AWS Solution Constructs
+AWS Solutions constructs is an open-source extension of the AWS CDK that provides mulit-service, well-architected patterns.
+You can use AWS Solutions constructs to quickly defining solutions in code to create predictable and repeatable infrastructure.  
+[AWS Solutions Construct](https://docs.aws.amazon.com/solutions/latest/constructs/welcome.html)  
+
+### AWS CDK vs Terraform
+Why you may choose AWS CDK over Terraform
+1. __Easier to learn__  
+Since CDK uses general purpose languages like JavaScrip, Java, Python, and C# which a developer may already know.  Terraform uses domain-specific language HCL.
+2. __Better developer experience__  
+Developer can leverage the full power of their IDE including autocomplete, intellisense and strong typing. Terraform may also have auto complete.
+3. __Built-in support for AWS resources__  
+Develops can leverage CDK'S high-level L3 constructs to deploy multiple services or an entire AWS architecture. Services may only be defined on a resource-by-resource bases in Terraform.  
+4. __Better integration with AWS services__  
+AWS CDK has better integration with other AWS services. Developers can easily integrate their infrastructure code with AWS services like AWS CodePipeline, AWS CodeBuild and AWS CloudFormation. 
