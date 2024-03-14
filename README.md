@@ -72,7 +72,22 @@ To install LocalStack you first need to install `Python 3`, and Docker. `pip` th
 [Getting Started with LocalStack ](https://docs.localstack.cloud/get-started/)   
 [Github LocalStack](https://github.com/localstack/localstack)  
 
-__Local Stack Setup__  
+#### Local Stack Setup__  
+__Docker Dependency__  
+Local stack required docker to run.  
+Install Docker desktop from [docker for desktop](https://docs.docker.com/desktop/)  
+```bash
+# Check that docker is running
+$ docker ps
+```
+
+__Install using Brew__   
+```
+$ brew install localstack/tap/localstack-cli
+$ localstack --version
+```
+
+__Instal using Python__  
 1. Install Python3 using the python version manager `pyenv`
 ```bash
 $ brew install pyenv
@@ -86,30 +101,37 @@ $ pyenv global 3.9.2
 # Close and restart your terminal window for the changes to take effect, then check version
 $ python --version
 ```  
-2. Install Docker desktop from [docker for desktop](https://docs.docker.com/desktop/)  
-```bash
-# Check that docker is runnint
-$ docker ps
-```
-3. Install LocalStack
+2. Install LocalStack using pip
 ```bash
 # you may need to run pip on a new terminal window because it was just newly to you path and needs to take effect.  
 # you may need to update pip before installing localstack
 $ pip install --upgrade pip
 $ pip install localstack
+$ localstack --version
 ```
-4. Start LocalStack as a deamon
+If you already have localstack installed and want to upgrade it, do
+```bash
+$ pip install --upgrade localstack
+$ localstack --version
+```
+
+__Basic Operations__    
+To start LocalStack as a deamon
 ```
 $ localstack start -d
-```
-5. Check LocalStack status and see all the emulated services
+```  
+To check LocalStack status and see all the emulated services
 ```
 $ localstack status
 $ localstack status services
 ```
 
+__LocalStack Desktop__  
+A desktop version is also available at [app.localstack.cloud/download](https://app.localstack.cloud/download) to learn more, go to
+[LocalStack installation](https://docs.localstack.cloud/getting-started/installation/)
+
 #### LocalStack integration  
-__AWS CDK CLI for AWS CLI__  
+__AWS CLI for LocalStack__  
 `awslocal` is a thin wrapper and drop-in replacement for the `aws` command that runs commands directly againt LocalStack.
 1. Install `awslocal`  
 ```
@@ -121,7 +143,7 @@ $ awslocal ec2 describe-instances
 ```
 
 __AWS CDK CLI for LocalStack__    
-`cdklocal` is a think wrapper script for using the AWS CDK library againt local API provided by LocalStack
+`cdklocal` is a thin wrapper script for using the AWS CDK library against local API provided by LocalStack
 1. Install  `cdklocal`
 ```
 $ npm install -g aws-cdk-local aws-cdk
@@ -150,7 +172,7 @@ $ cdklocal diff
 $ cdklocal deploy
 ```  
 
-__Destroy the local infrastrcuture__
+__Destroy the local infrastrcuture__  
 To cleanup and tear down the resoruces that are part of the project
 ```
 $ localstack destory
