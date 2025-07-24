@@ -72,7 +72,7 @@ To install LocalStack you first need to install `Python 3`, and Docker. `pip` th
 [Getting Started with LocalStack ](https://docs.localstack.cloud/get-started/)   
 [Github LocalStack](https://github.com/localstack/localstack)  
 
-#### Local Stack Setup__  
+#### Local Stack Setup  
 __Docker Dependency__  
 Local stack required docker to run.  
 Install Docker desktop from [docker for desktop](https://docs.docker.com/desktop/)  
